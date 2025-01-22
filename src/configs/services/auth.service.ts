@@ -2,10 +2,15 @@ import { LoginRequest } from "../../utils/types/auth";
 import { api, ResponseAPI } from "./api.service";
 
 export async function loginService(
-  data: Omit<LoginRequest, "remember">
+  data: Omit<LoginRequest, "remember">,
+  token: string
 ): Promise<ResponseAPI> {
   try {
-    const response = await api.post("/login", data);
+    const response = await api.post("/login", data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     return {
       ok: response.data.ok,

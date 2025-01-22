@@ -11,6 +11,7 @@ const initialState: Assessment = {
   description: "",
   grade: 0,
   createdAt: new Date(),
+  studentId: "",
 };
 
 const assessmentDetailSlice = createSlice({
@@ -23,6 +24,7 @@ const assessmentDetailSlice = createSlice({
       return {
         ...state, // {}
         ...action.payload, // {}
+        
       };
     },
     // Reset
