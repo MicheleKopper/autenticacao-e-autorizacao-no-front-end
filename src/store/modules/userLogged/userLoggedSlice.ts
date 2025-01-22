@@ -4,61 +4,54 @@ import { LoginRequest } from "../../../utils/types/auth";
 import { loginService } from "../../../configs/services/auth.service";
 import { showAlert } from "../alert/alertSlice";
 
-// Nome OK
-// Valor inicial OK
-// Ações (functions/reducer)
-
-/**
- *  createAsyncThunk(nome, callback): Promise
- *
- * nome: typePrefix
- * callback: payloadCreator
- *
- *  (arg, thunkAPI) => {}
- *  arg: paramentro/dados
- *  thunkAPI: objeto que contem algumas funcionalidades/ferramentas
- */
-
-export const loginAsyncThunk = createAsyncThunk(
+// AsyncThunk para login
+export const loginAsyncThunk = createAsyncThunk<
+  ResponseAPI,
+  LoginRequest,
+  { rejectValue: string }
+>(
   "userLogged/loginAsyncThunk",
-  async (data: LoginRequest, { dispatch }) => {
-    const { email, password, remember } = data;
+  async (data: LoginRequest, { dispatch, rejectWithValue }) => {
+    const { email, password } = data;
 
-    // Logica para fazer login na nossa api (chamar a api): Promise
-    const response = await loginService({ email, password });
+    try {
+      // Chamada à API de login
+      const response = await loginService({ email, password });
 
-    if (!response.ok) {
+      // Exibe alerta de erro
+      if (!response.ok) {
+        dispatch(
+          showAlert({
+            message: response.message,
+            type: "error",
+          })
+        );
+        return rejectWithValue(response.message); // Passa o erro para o estado `rejected`
+      }
+
+      // Exibe alerta de sucesso
       dispatch(
         showAlert({
           message: response.message,
-          type: "error",
+          type: "success",
         })
       );
-    }
 
-    const responseWithRemenber = {
-      ...response, // { ok, message }
-      data: {
-        ...response.data, //  { token }
-        student: {
-          ...response.data.student, // { id, name....}
-          remember,
+      return {
+        ...response,
+        data: {
+          ...response.data,
         },
-      },
-    };
+      };
 
-    dispatch(
-      showAlert({
-        message: response.message,
-        type: "success",
-      })
-    );
-
-    // Vai virar o paylod lá no builder
-    return responseWithRemenber; // Data da requisição { ok, message, data }
+      // Retorna erro genérico
+    } catch {
+      return rejectWithValue("Failed to connect to the server");
+    }
   }
 );
 
+// Estado inicial da slice
 interface InitialState {
   ok: boolean;
   message: string;
@@ -67,8 +60,9 @@ interface InitialState {
     id: string;
     name: string;
     email: string;
-    remember: boolean;
   };
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: InitialState = {
@@ -79,61 +73,32 @@ const initialState: InitialState = {
     email: "",
     id: "",
     name: "",
-    remember: false,
   },
+  loading: false,
+  error: null,
 };
 
 const userLoggedSlice = createSlice({
   name: "userLogged",
   initialState: initialState,
   reducers: {
-    // login(estadoAtual, action => type e o payload) {},
-    // login(state, action: PayloadAction<LoginRequest>) {
-    //   const { email, password, remember } = action.payload;
-
-    //   const userFound = users.find(
-    //     (user) => user.email === email && user.senha === password
-    //   );
-
-    //   if (!userFound) {
-    //     state.errors = "Invalid email or password!!";
-    //     return state;
-    //   }
-
-    //   state.id = userFound.id;
-    //   state.name = userFound.name;
-    //   state.email = userFound.email;
-    //   state.remember = remember;
-    //   state.errors = "";
-
-    //   return state;
-    // },
-    // Logout
     logout() {
-      return initialState;
+      return initialState; // Reseta o estado ao fazer logout
     },
   },
   extraReducers(builder) {
-    /**
-     *  builder.addCase(actionCreator, reducer)
-     *
-     * actionCreator: Qual função createAsyncThuck e ciclo de estado eu quero controlar
-     * reducer: callback = Tenho acesso ao meu state
-     */
-
-    // LOGIN USER
     builder
-      .addCase(loginAsyncThunk.pending, () => {
-        // state => estado atual { id, name.... }
-        // action.payload => dados retornado da minha função asyncThuck
-        console.log("Estou em estado de pending na função loginAsyncThunk");
+      // Estado pendin = requisição em andamento
+      .addCase(loginAsyncThunk.pending, (state) => {
+        state.loading = true; // Ativa o loading
+        state.error = null; // Limpa erros anteriores
       })
+
+      // Estado fulfilled = requisição concluída
       .addCase(
         loginAsyncThunk.fulfilled,
         (state, action: PayloadAction<ResponseAPI>) => {
-          console.log("Estou em estado de fulfilled na função loginAsyncThunk");
-          console.log({ state, payload: action.payload });
-
+          state.loading = false; // Finaliza o loading
           state.ok = action.payload.ok;
           state.message = action.payload.message;
 
@@ -144,10 +109,12 @@ const userLoggedSlice = createSlice({
           }
         }
       )
-      .addCase(loginAsyncThunk.rejected, (state) => {
-        console.log("Estou em estado de rejected na função loginAsyncThunk");
+
+      // Estado rejected = requisição rejeitada
+      .addCase(loginAsyncThunk.rejected, (state, action) => {
+        state.loading = false; // Finaliza o loading
         state.ok = false;
-        state.message = "Error login";
+        state.error = action.payload || "Unexpected error occurred"; // Mensagem de erro
       });
   },
 });
