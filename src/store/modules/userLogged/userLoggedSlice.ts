@@ -3,118 +3,106 @@ import { ResponseAPI } from "../../../configs/services/api.service";
 import { LoginRequest } from "../../../utils/types/auth";
 import { loginService } from "../../../configs/services/auth.service";
 import { showAlert } from "../alert/alertSlice";
+import { StudentType } from "../../../utils/types/student";
 
-// AsyncThunk para login
-export const loginAsyncThunk = createAsyncThunk<
-  ResponseAPI,
-  LoginRequest,
-  { rejectValue: string }
->(
-  "userLogged/loginAsyncThunk",
-  async (data: LoginRequest, { dispatch, rejectWithValue }) => {
-    const { email, password } = data;
+export const loginAsyncThunk = createAsyncThunk(
+  "userLogged/login",
+  async (data: LoginRequest, { dispatch }) => {
+    const { email, password, remember } = data;
 
-    try {
-      // Chamada à API de login
-      const response = await loginService({ email, password });
-
-      // Exibe alerta de erro
-      if (!response.ok) {
-        dispatch(
-          showAlert({
-            message: response.message,
-            type: "error",
-          })
-        );
-        return rejectWithValue(response.message); // Passa o erro para o estado `rejected`
-      }
-
-      // Exibe alerta de sucesso
+    const response = await loginService({ email, password });
+    if (!response.ok) {
       dispatch(
         showAlert({
           message: response.message,
-          type: "success",
+          type: "error",
         })
       );
-
-      return {
-        ...response,
-        data: {
-          ...response.data,
-        },
-      };
-
-      // Retorna erro genérico
-    } catch {
-      return rejectWithValue("Failed to connect to the server");
     }
+
+    const responseWithRemember = {
+      ...response, // { ok, message }
+      data: {
+        token: response.data.token, //  { token }
+        student: {
+          ...response.data.student, // { id, name....}
+          remember,
+        },
+      },
+    };
+
+    dispatch(
+      showAlert({
+        message: response.message,
+        type: "success",
+      })
+    );
+
+    // Vai virar o payload lá no builder
+    return responseWithRemember; // Data da requisição { ok, message, data }
   }
 );
 
-// Estado inicial da slice
 interface InitialState {
   ok: boolean;
   message: string;
+  loading: boolean;
   token: string;
   student: {
     id: string;
     name: string;
     email: string;
+    studentType: StudentType;
+    remember: boolean;
   };
-  loading: boolean;
-  error: string | null;
 }
 
 const initialState: InitialState = {
   ok: false,
   message: "",
+  loading: false,
   token: "",
   student: {
-    email: "",
     id: "",
     name: "",
+    email: "",
+    studentType: "M",
+    remember: false,
   },
-  loading: false,
-  error: null,
 };
 
 const userLoggedSlice = createSlice({
   name: "userLogged",
-  initialState: initialState,
+  initialState,
   reducers: {
     logout() {
-      return initialState; // Reseta o estado ao fazer logout
+      localStorage.removeItem("userLogged");
+      return initialState;
     },
   },
   extraReducers(builder) {
+    // LOGIN USER
     builder
-      // Estado pendin = requisição em andamento
       .addCase(loginAsyncThunk.pending, (state) => {
-        state.loading = true; // Ativa o loading
-        state.error = null; // Limpa erros anteriores
+        state.loading = true;
       })
-
-      // Estado fulfilled = requisição concluída
       .addCase(
         loginAsyncThunk.fulfilled,
         (state, action: PayloadAction<ResponseAPI>) => {
-          state.loading = false; // Finaliza o loading
+          state.loading = false;
           state.ok = action.payload.ok;
           state.message = action.payload.message;
 
-          // Só posso atribuir token e student quando o ok for true
           if (action.payload.ok) {
             state.token = action.payload.data.token;
             state.student = action.payload.data.student;
           }
         }
       )
-
-      // Estado rejected = requisição rejeitada
-      .addCase(loginAsyncThunk.rejected, (state, action) => {
-        state.loading = false; // Finaliza o loading
+      .addCase(loginAsyncThunk.rejected, (state) => {
+        state.loading = false;
         state.ok = false;
-        state.error = action.payload || "Unexpected error occurred"; // Mensagem de erro
+        state.message = "Erro no Login";
       });
   },
 });

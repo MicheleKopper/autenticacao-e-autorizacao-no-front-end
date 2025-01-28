@@ -3,10 +3,13 @@ import {
   FormControl,
   FormLabel,
   Grid2,
+  MenuItem,
   TextField,
   Typography,
 } from "@mui/material";
 import React, { useState } from "react";
+import { useAppDispatch } from "../store/hooks";
+import { createStudentAsyncThunk } from "../store/modules/userLogged/signupSlice";
 
 // Campo de erro
 interface ErrorFields {
@@ -19,6 +22,10 @@ interface ErrorFields {
 }
 
 export function Register() {
+// Dispatch do submit
+const dispatch = useAppDispatch();
+
+
 
   // 2 - Validação de dados
   const [errors, setError] = useState<ErrorFields>({
@@ -90,9 +97,22 @@ export function Register() {
     const age = Number(event.currentTarget["age"].value);
     const typeStudent = event.currentTarget["typeStudent"].value;
 
+    
+    
     validate(nameStudent, email, password, cpf, age, typeStudent);
+    
+   
 
-    console.log({ nameStudent, email, password, cpf, age, typeStudent });
+    dispatch(
+      createStudentAsyncThunk({
+        nameStudent,
+        email,
+        password,
+        cpf,
+        age,
+        typeStudent,
+      })
+    );
   }
 
   return (
@@ -216,7 +236,6 @@ export function Register() {
             name="typeStudent"
             select
             variant="outlined"
-            size="small"
             fullWidth
             error={!!errors.typeStudent}
             helperText={errors.typeStudent}
@@ -226,9 +245,9 @@ export function Register() {
               }
             }}
           >
-            <option value="M">Matriculado</option>
-            <option value="F">Formado</option>
-            <option value="T">Tech-Helper</option>
+            <MenuItem value="M">Matriculado</MenuItem>
+            <MenuItem value="F">Formado</MenuItem>
+            <MenuItem value="T">Tech-Helper</MenuItem>
           </TextField>
         </FormControl>
       </Grid2>
